@@ -11,7 +11,8 @@ PST + search params tester
 **Interface** \
 UCI \
 Board to + from FEN \
-Board to + from PGN
+Board to + from PGN \
+Opening book files (eg. Polyglot)
 
 **Board Representation** \
 Legal move generator \
