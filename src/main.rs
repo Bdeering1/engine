@@ -1,3 +1,6 @@
+mod uci;
+mod board;
+
 fn main() {
-    println!("Hello, world!");
+    uci::run_uci();
 }
