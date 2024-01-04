@@ -1,6 +1,14 @@
 use std::io::stdin;
+use std::str::FromStr;
+
+use chess::BitBoard;
+
+use crate::board::{Board, Move};
 
 pub fn run_uci() {
+    let mut board: Board;
+    let mut debug = false;
+
     loop {
         let mut buf = String::new();
         stdin().read_line(&mut buf).unwrap();
@@ -13,8 +21,8 @@ pub fn run_uci() {
             }
             "debug" => {
                 match tokens[1] {
-                    "on" => (),
-                    "off" => (),
+                    "on" => debug = true,
+                    "off" => debug = false,
                     _ => (),
                 }
             },
@@ -22,13 +30,29 @@ pub fn run_uci() {
                 println!("readyok");
             },
             "setoption" => (),
-            "ucinewmgame" => (),
-            "position" => (),
+            "ucinewgame" => (),
+            "position" => {
+                board = match tokens[1] {
+                    "startpos" => {
+                        Board::new()
+                    },
+                    fen => {
+                        Board::from_fen(fen)
+                    }
+                };
+                for idx in 2..tokens.len() {
+                    let m = Move::from_str(tokens[idx]).unwrap();
+                    board.make_move(m);
+                }
+                if debug {
+                    println!("info string {}", board);
+                }
+            },
             "go" => (),
             "ponderhit" => (),
             "stop" => (),
             "quit" => break,
-            _ => println!("unrecognized"),
+            _ => ()
         }
     }
 }
