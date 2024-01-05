@@ -9,20 +9,25 @@ const DARK_SQUARES: BitBoard = BitBoard(0xAA55_AA55_AA55_AA55);
 pub struct Board {
     pub position: chess::Board,
     history: Vec<chess::Board>,
+    reversible_counts: Vec<usize>,
 }
 
 impl Board {
+    /// Returns a new instance of `Board` with the default position
     pub fn new() -> Self {
         Self {
             position: chess::Board::default(),
-            history: vec![]
+            history: vec![],
+            reversible_counts: vec![],
         }
     }
 
+    /// Returns a new instance of `Board` with the given fen position
     pub fn from_fen(fen: &str) -> Self {
         Self {
             position: chess::Board::from_str(fen).unwrap(),
             history: vec![],
+            reversible_counts: vec![],
         }
     }
 
@@ -46,15 +51,20 @@ impl Board {
     }
 
     /// Make a move on the board
-    pub fn make_move(&mut self, m: Move) {
+    pub fn make_move(&mut self, mv: Move) {
         self.history.push(self.position);
-        self.position = self.position.make_move_new(m);
+        self.position = self.position.make_move_new(mv);
+
+        self.reversible_counts.push(self.reversible_counts[self.reversible_counts.len() - 1] + 1);
     }
     
     /// Undo the most recent move
     pub fn undo_move(&mut self) {
         if let Some(pos) = self.history.pop() {
             self.position = pos;
+            self.reversible_counts.pop();
+        } else {
+            panic!("Attempted to undo a move that doesn't exist!");
         }
     }
 
@@ -73,21 +83,54 @@ impl Board {
         false
     }
 
+    /// Returns true if the position is a draw by fifty move rule
+    pub fn is_fifty_move_draw(&self) -> bool {
+        self.reversible_counts[self.reversible_counts.len() - 1] >= 100 
+    }
+
     /// !TODO Returns true if the position should be considered drawn by insufficient material
     /// 
     /// Included cases:
     ///
     /// king vs king
-    /// kings and knights
+    /// kings and two or less knights
     /// kings and bishops of the same color
     ///
-    /// *kings and knights is not technically a draw but may be a helpful optimization
+    /// Edge cases:
+    /// king + 2 knights vs king
+    /// king + knight vs king + knight
+    /// - both return true: neither position is a technically a draw but no forced win is possible
+    ///
+    /// king + bishop vs king + knight
+    /// - returns false: no forced win is possible, but ignoring this case speeds up the function
     pub fn is_insufficient_material(&self) -> bool {
-        if self.position.pieces(Piece::King) == self.position.combined() {
+        let kings = self.position.pieces(Piece::King);
+
+        if kings == self.position.combined() {
             return true;
         }
 
+        // kings and two or less knights
+        let all_pieces = self.position.combined() ^ kings;
+        let knights = *self.position.pieces(Piece::Knight);
+        if all_pieces == knights && knights.popcnt() <= 2 {
+            return true 
+        }
+
+        // kings and bishops of the same color
+        let bishops = *self.position.pieces(Piece::Bishop);
+        if all_pieces == bishops
+            && ((bishops & LIGHT_SQUARES == EMPTY) || (bishops & DARK_SQUARES == EMPTY)) {
+            return true
+        }
+
         false
+    }
+
+    /// Returns true if the given move is reversible (not a pawn move or capture)
+    fn is_reversible(&self, mv: Move) -> bool {
+        self.position.piece_on(mv.get_source()) == Some(Piece::Pawn)
+        || self.position.color_on(mv.get_dest()) == Some(!self.position.side_to_move())
     }
 }
 
@@ -100,3 +143,4 @@ impl fmt::Display for Board {
 pub type MoveIterator = MoveGen;
 
 pub type Move = ChessMove;
+
