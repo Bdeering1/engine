@@ -24,10 +24,11 @@ impl Board {
 
     /// Returns a new instance of `Board` with the given fen position
     pub fn from_fen(fen: &str) -> Self {
+        let tokens = fen.split(" ").collect::<Vec<&str>>();
         Self {
             position: chess::Board::from_str(fen).unwrap(),
             history: vec![],
-            reversible_counts: vec![ 0 ],
+            reversible_counts: vec![ tokens[4].parse().unwrap() ],
         }
     }
 
@@ -88,7 +89,43 @@ impl Board {
         self.reversible_counts[self.reversible_counts.len() - 1] >= 100 
     }
 
-    /// !TODO Returns true if the position should be considered drawn by insufficient material
+    /// Returns true is the position is guaranteed to be drawn by to insufficient material
+    ///
+    /// Included cases:
+    ///
+    /// king vs king
+    /// king + knight vs king
+    /// kings and bishops of the same colour
+    pub fn is_insufficient_material(&self) -> bool {
+        let kings = self.position.pieces(Piece::King);
+        let all_pieces = self.position.combined() ^ kings;
+
+        // if (non-king) pieces exist on both light and dark squares, no draw occurs
+        if (all_pieces & LIGHT_SQUARES != EMPTY) && (all_pieces & DARK_SQUARES != EMPTY) {
+            return false;
+        }
+
+        // king vs king
+        if all_pieces == EMPTY {
+            return true;
+        }
+
+        // king + knight vs king
+        let knights = *self.position.pieces(Piece::Knight);
+        if all_pieces == knights && knights.popcnt() == 1 {
+            return true;
+        }
+
+        // kings and bishops of the same colour
+        let bishops = *self.position.pieces(Piece::Bishop);
+        if all_pieces == bishops {
+            return true
+        }
+
+        false
+    }
+
+    /// Returns true if the position should be considered drawn by insufficient material
     /// 
     /// Included cases:
     ///
@@ -103,7 +140,7 @@ impl Board {
     ///
     /// king + bishop vs king + knight
     /// - returns false: no forced win is possible, but ignoring this case speeds up the function
-    pub fn is_insufficient_material(&self) -> bool {
+    pub fn is_insufficient_material_pseudo(&self) -> bool {
         let kings = self.position.pieces(Piece::King);
 
         if kings == self.position.combined() {
@@ -117,7 +154,7 @@ impl Board {
             return true 
         }
 
-        // kings and bishops of the same color
+        // kings and bishops of the same colour
         let bishops = *self.position.pieces(Piece::Bishop);
         if all_pieces == bishops
             && ((bishops & LIGHT_SQUARES == EMPTY) || (bishops & DARK_SQUARES == EMPTY)) {
@@ -144,3 +181,65 @@ pub type MoveIterator = MoveGen;
 
 pub type Move = ChessMove;
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chess::Square;
+
+    #[test]
+    fn test_make_undo_move() {
+        let mut board = Board::new();
+        board.make_move(Move::new(Square::E2, Square::E4, None));
+        board.make_move(Move::new(Square::E7, Square::E5, None));
+        board.undo_move();
+        board.undo_move();
+        assert!(board.position.is_sane());
+        assert!(board.reversible_counts.pop() == Some(0));
+    }
+
+    #[test]
+    fn test_is_repeated() {
+        let mut board = Board::from_fen("Q6k/8/K7/8/8/8/8/8 b - - 0 1");
+        board.make_move(Move::new(Square::H8, Square::H7, None));
+        board.make_move(Move::new(Square::A8, Square::A7, None));
+        board.make_move(Move::new(Square::H7, Square::H8, None));
+        board.make_move(Move::new(Square::A7, Square::A8, None));
+        assert!(board.is_repeated());
+    }
+
+    #[test]
+    fn test_is_fifty_move_draw() {
+        assert!(Board::from_fen("K6k/8/8/8/8/8/8/8 w - - 100 80").is_fifty_move_draw());
+    }
+
+    #[test]
+    fn test_is_insufficient_material() {
+        // king vs king
+        assert!(Board::from_fen("K6k/8/8/8/8/8/8/8 w - - 0 1").is_insufficient_material());
+        // king + knight vs king
+        assert!(Board::from_fen("4KN1k/8/8/8/8/8/8/8 w - - 0 1").is_insufficient_material());
+        // kings and bishops of the same colour
+        assert!(Board::from_fen("B1B1BK1k/8/8/8/8/8/8/8 w - - 0 1").is_insufficient_material());
+
+        // king + 2 knights vs king
+        assert!(!Board::from_fen("3KNN1k/8/8/8/8/8/8/8 w - - 0 1").is_insufficient_material());
+        // king + opposite colour bishops
+        assert!(!Board::from_fen("3KBB1k/8/8/8/8/8/8/8 w - - 0 1").is_insufficient_material());
+    }
+
+    #[test]
+    fn test_is_insufficent_material_pseudo() {
+        // king vs king
+        assert!(Board::from_fen("K6k/8/8/8/8/8/8/8 w - - 0 1").is_insufficient_material_pseudo());
+        // king + knight vs king
+        assert!(Board::from_fen("4KN1k/8/8/8/8/8/8/8 w - - 0 1").is_insufficient_material_pseudo());
+        // kings and bishops of the same colour
+        assert!(Board::from_fen("B1B1BK1k/8/8/8/8/8/8/8 w - - 0 1").is_insufficient_material_pseudo());
+
+        // king + 2 knights vs king
+        // Note: this case differs from `test_is_insufficient_material`
+        assert!(Board::from_fen("3KNN1k/8/8/8/8/8/8/8 w - - 0 1").is_insufficient_material_pseudo());
+        // king + opposite colour bishops
+        assert!(!Board::from_fen("3KBB1k/8/8/8/8/8/8/8 w - - 0 1").is_insufficient_material_pseudo());
+    }
+}
