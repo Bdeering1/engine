@@ -1,7 +1,9 @@
 use std::io::stdin;
 use std::str::FromStr;
 
-use crate::board::{Board, Move};
+use chess::Color;
+
+use crate::{board::{Board, Move}, search::search};
 
 pub fn run_uci() {
     let mut board = Board::new();
@@ -60,7 +62,46 @@ pub fn run_uci() {
                     println!("info string move_count = {}", move_count);
                 }
             },
-            "go" => (),
+            "go" => {
+                let mut ms_remaining: usize = 0;
+                let mut ms_inc: usize = 0;
+
+                let mut idx = 1;
+                while idx < tokens.len() {
+                    match tokens[idx] {
+                        "ponder" => ms_remaining = usize::MAX,
+                        "infinite" => ms_remaining = usize::MAX,
+                        "wtime" => {
+                            if board.position.side_to_move() == Color::White {
+                                idx += 1;
+                                ms_remaining = tokens[idx].parse().unwrap();
+                            }
+                        },
+                        "btime" => {
+                            if board.position.side_to_move() == Color::Black {
+                                idx += 1;
+                                ms_remaining = tokens[idx].parse().unwrap();
+                            }
+                        },
+                        "winc" => {
+                            if board.position.side_to_move() == Color::White {
+                                idx += 1;
+                                ms_inc = tokens[idx].parse().unwrap();
+                            }
+                        },
+                        "binc" => {
+                            if board.position.side_to_move() == Color::Black {
+                                idx += 1;
+                                ms_inc = tokens[idx].parse().unwrap();
+                            }
+                        },
+                        _ => ()
+                    }
+                    idx += 1;
+                }
+
+                println!("bestmove {}", search(&board, ms_remaining, ms_inc));
+            },
             "ponderhit" => (),
             "stop" => (),
             "quit" => break,
