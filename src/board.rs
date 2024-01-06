@@ -18,7 +18,7 @@ impl Board {
         Self {
             position: chess::Board::default(),
             history: vec![],
-            reversible_counts: vec![],
+            reversible_counts: vec![ 0 ],
         }
     }
 
@@ -27,7 +27,7 @@ impl Board {
         Self {
             position: chess::Board::from_str(fen).unwrap(),
             history: vec![],
-            reversible_counts: vec![],
+            reversible_counts: vec![ 0 ],
         }
     }
 
