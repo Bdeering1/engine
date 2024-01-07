@@ -63,14 +63,14 @@ pub fn run_uci() {
                 }
             },
             "go" => {
-                let mut ms_remaining: usize = 0;
-                let mut ms_inc: usize = 0;
+                let mut ms_remaining: u32 = 0;
+                let mut ms_inc: u32 = 0;
 
                 let mut idx = 1;
                 while idx < tokens.len() {
                     match tokens[idx] {
-                        "ponder" => ms_remaining = usize::MAX,
-                        "infinite" => ms_remaining = usize::MAX,
+                        "ponder" => ms_remaining = u32::MAX,
+                        "infinite" => ms_remaining = u32::MAX,
                         "wtime" => {
                             if board.position.side_to_move() == Color::White {
                                 idx += 1;
@@ -100,7 +100,7 @@ pub fn run_uci() {
                     idx += 1;
                 }
 
-                println!("bestmove {}", search(&board, ms_remaining, ms_inc));
+                println!("bestmove {}", search(&mut board, ms_remaining, ms_inc));
             },
             "ponderhit" => (),
             "stop" => (),
