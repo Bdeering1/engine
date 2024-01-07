@@ -3,10 +3,10 @@ use std::str::FromStr;
 
 use chess::Color;
 
-use crate::{board::{Board, Move}, search::search};
+use crate::{board::{Board, Move}, search::SearchContext};
 
 pub fn run_uci() {
-    let mut board = Board::new();
+    let mut s = SearchContext::new();
     let mut debug = false;
     let mut current_pos = "startpos".to_string();
     let mut move_count = 0;
@@ -36,7 +36,7 @@ pub fn run_uci() {
             "position" => {
                 let mut moves_start = 3;
                 if tokens[1] != current_pos {
-                    board = match tokens[1] {
+                    s.board = match tokens[1] {
                         "startpos" => {
                             Board::new()
                         },
@@ -54,11 +54,11 @@ pub fn run_uci() {
                 moves_start += move_count;
                 for idx in moves_start..tokens.len() {
                     let m = Move::from_str(tokens[idx]).unwrap();
-                    board.make_move(m);
+                    s.board.make_move(m);
                     move_count += 1;
                 }
                 if debug {
-                    println!("info string {}", board);
+                    println!("info string {}", s.board);
                     println!("info string move_count = {}", move_count);
                 }
             },
@@ -72,25 +72,25 @@ pub fn run_uci() {
                         "ponder" => ms_remaining = u32::MAX,
                         "infinite" => ms_remaining = u32::MAX,
                         "wtime" => {
-                            if board.position.side_to_move() == Color::White {
+                            if s.board.position.side_to_move() == Color::White {
                                 idx += 1;
                                 ms_remaining = tokens[idx].parse().unwrap();
                             }
                         },
                         "btime" => {
-                            if board.position.side_to_move() == Color::Black {
+                            if s.board.position.side_to_move() == Color::Black {
                                 idx += 1;
                                 ms_remaining = tokens[idx].parse().unwrap();
                             }
                         },
                         "winc" => {
-                            if board.position.side_to_move() == Color::White {
+                            if s.board.position.side_to_move() == Color::White {
                                 idx += 1;
                                 ms_inc = tokens[idx].parse().unwrap();
                             }
                         },
                         "binc" => {
-                            if board.position.side_to_move() == Color::Black {
+                            if s.board.position.side_to_move() == Color::Black {
                                 idx += 1;
                                 ms_inc = tokens[idx].parse().unwrap();
                             }
@@ -100,7 +100,7 @@ pub fn run_uci() {
                     idx += 1;
                 }
 
-                println!("bestmove {}", search(&mut board, ms_remaining, ms_inc));
+                println!("bestmove {}", s.search(ms_remaining, ms_inc, debug));
             },
             "ponderhit" => (),
             "stop" => (),

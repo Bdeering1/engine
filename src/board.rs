@@ -56,7 +56,13 @@ impl Board {
         self.history.push(self.position);
         self.position = self.position.make_move_new(mv);
 
-        self.reversible_counts.push(self.reversible_counts[self.reversible_counts.len() - 1] + 1);
+        self.reversible_counts.push(
+            if self.is_reversible(mv) {
+                self.reversible_counts[self.reversible_counts.len() - 1] + 1
+            } else {
+                0
+            }
+        );
     }
     
     /// Undo the most recent move
