@@ -5,10 +5,15 @@ use std::time::Instant;
 
 const CHECKMATE_VALUE: i32 = 50000;
 
+pub struct DebugInfo {
+    pub nodes: u32,
+}
+
 pub struct SearchContext {
     pub board: Board,
     best_move: Move,
     search_depth: u32,
+    pub debug: DebugInfo,
 }
 
 impl SearchContext {
@@ -17,11 +22,13 @@ impl SearchContext {
             board: Board::new(),
             best_move: Move::default(),
             search_depth: 0,
+            debug: DebugInfo {nodes: 0},
         }
     }
 
     pub fn search(&mut self, ms_remaining: u32, ms_inc: u32, debug: bool) -> Move {
         // for tracking how much time has passed in the search [timer.elapsed();]
+        self.debug.nodes = 0;
         let timer = Instant::now();
 
         self.search_depth = 1;
@@ -58,6 +65,9 @@ impl SearchContext {
 
         // main search
         for cur_move in moves {
+            //should make this only happen if in debug mode?
+            self.debug.nodes += 1;
+
             self.board.make_move(cur_move);
             let score = -self.nega_max(timer, depth - 1, -beta, -alpha);
             self.board.undo_move();

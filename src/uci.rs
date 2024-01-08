@@ -1,4 +1,4 @@
-use std::io::stdin;
+use std::{io::stdin, time::Instant};
 use std::str::FromStr;
 
 use chess::Color;
@@ -102,6 +102,25 @@ pub fn run_uci() {
 
                 println!("bestmove {}", s.search(ms_remaining, ms_inc, debug));
             },
+            "benchmark" => {
+                match tokens[1] {
+                    "nps" => { //nodes per second
+                        let trials: u64 = 20;
+                        let mut nps_sum: f64 = 0.;
+                        for i in 0..trials {
+                            let time: Instant = Instant::now();
+                            let m = s.search(60000, 0, debug);
+                            let end = time.elapsed().as_millis();
+                            s.board.make_move(m);
+                            let nps = s.debug.nodes as f64/(end as f64/1000.);
+                            nps_sum += nps;
+                            println!("processed {} nodes in {}ms, ({:.2} nps) [{}/{}]", s.debug.nodes, end, nps, i+1, trials);
+                        }
+                        println!("average nps: {:.2} over {} trials", nps_sum/trials as f64, trials);
+                    },
+                    _ => (),
+                }
+            }
             "ponderhit" => (),
             "stop" => (),
             "quit" => break,
