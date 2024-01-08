@@ -26,10 +26,10 @@ impl SearchContext {
 
         self.search_depth = 1;
         loop {
+            let score = self.nega_max(&timer, self.search_depth, i32::MIN + 1, i32::MAX);
             if debug {
-                println!("info depth {} pv {}", self.search_depth, self.best_move);
+                println!("info depth {} score cp {} pv {}", self.search_depth, score, self.best_move);
             }
-            self.nega_max(&timer, self.search_depth, i32::MIN + 1, i32::MAX);
             if timer.elapsed().as_millis() as u32 > ms_remaining / 60 {
                 return self.best_move
             }
@@ -38,9 +38,7 @@ impl SearchContext {
         }
     }
 
-    fn nega_max(&mut self, timer: &Instant, depth: u32, mut alpha: i32, mut beta: i32) -> i32 {
-        if depth == 0 { return eval(&self.board); }
-        
+    fn nega_max(&mut self, timer: &Instant, depth: u32, mut alpha: i32, beta: i32) -> i32 {
         let is_root = depth == self.search_depth;
         if !is_root
             && (self.board.is_repeated()
@@ -48,6 +46,8 @@ impl SearchContext {
             || self.board.is_fifty_move_draw()) {
             return 0;
         }
+
+        if depth == 0 { return eval(&self.board); }
 
         let moves = self.board.moves();
         // let mut pv = Move::default();
