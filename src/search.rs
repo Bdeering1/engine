@@ -48,7 +48,7 @@ impl SearchContext {
         self.search_depth = 1;
         loop {
             let score = self.nega_max(&timer, self.search_depth, i32::MIN + 1, i32::MAX);
-            if verbose && score.abs() != OUT_OF_TIME_VALUE {
+            if verbose && !self.stop_search {
                 println!("info depth {} score cp {} pv {}", self.search_depth, score, self.best_move);
             }
             if timer.elapsed().as_millis() as u32 > move_time {
@@ -60,6 +60,11 @@ impl SearchContext {
     }
 
     fn nega_max(&mut self, timer: &Instant, depth: u32, mut alpha: i32, beta: i32) -> i32 {
+        if self.strict_timing && timer.elapsed().as_millis() as u32 > self.move_time {
+            self.stop_search = true;
+            return OUT_OF_TIME_VALUE;
+        }
+
         let is_root = depth == self.search_depth;
         if !is_root
             && (self.board.is_repeated()
@@ -68,12 +73,7 @@ impl SearchContext {
             return 0;
         }
 
-        if depth == 0 { return eval(&self.board); }
-
-        if timer.elapsed().as_millis() as u32 > self.move_time {
-            self.stop_search = true;
-            return OUT_OF_TIME_VALUE;
-        }
+        if depth == 0 { return self.q_search(timer, alpha, beta); }
 
         let moves = self.board.moves();
         // let mut pv = Move::default();
@@ -91,10 +91,12 @@ impl SearchContext {
             let score = -self.nega_max(timer, depth - 1, -beta, -alpha);
             self.board.undo_move();
 
+            if self.stop_search { return OUT_OF_TIME_VALUE; }
+
             if score > alpha {
                 alpha = score;
                 // pv = cur_move;
-                if is_root && !self.stop_search { self.best_move = cur_move; }
+                if is_root { self.best_move = cur_move; }
             }
             if score >= beta {
                 break;
@@ -102,6 +104,44 @@ impl SearchContext {
         }
 
         i32::min(alpha, beta)
+    }
+
+    fn q_search(&mut self, timer: &Instant, mut alpha: i32, beta: i32) -> i32 {
+        if self.strict_timing && timer.elapsed().as_millis() as u32 > self.move_time {
+            self.stop_search = true;
+            return OUT_OF_TIME_VALUE;
+        }
+
+        if self.board.is_repeated()
+            || self.board.is_insufficient_material()
+            || self.board.is_fifty_move_draw() {
+            return 0;
+        }
+
+        let score = eval(&self.board);
+
+        if score >= beta { return beta; }
+        if score > alpha { alpha = score; }
+
+        let mut moves = self.board.moves();
+        self.board.filter_captures(&mut moves);
+
+        if moves.len() == 0 {
+            return if self.board.checkers().popcnt() > 0 { CHECKMATE_VALUE } else { 0 }
+        }
+
+        for cur_move in moves {
+            self.board.make_move(cur_move);
+            let score = -self.q_search(timer, -beta, -alpha);
+            self.board.undo_move();
+
+            if self.stop_search { return OUT_OF_TIME_VALUE; }
+
+            if score >= beta { return beta; }
+            if score > alpha { alpha = score; }
+        }
+
+        alpha
     }
 }
 
