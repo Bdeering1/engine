@@ -65,12 +65,19 @@ pub fn run_uci() {
             "go" => {
                 let mut ms_remaining: u32 = 0;
                 let mut ms_inc: u32 = 0;
+                let mut move_time: u32 = 0;
+                let mut strict_timing = false;
 
                 let mut idx = 1;
                 while idx < tokens.len() {
                     match tokens[idx] {
                         "ponder" => ms_remaining = u32::MAX,
                         "infinite" => ms_remaining = u32::MAX,
+                        "movetime" => {
+                            idx += 1;
+                            move_time = tokens[idx].parse().unwrap();
+                            strict_timing = true;
+                        },
                         "wtime" => {
                             if s.board.position.side_to_move() == Color::White {
                                 idx += 1;
@@ -100,7 +107,10 @@ pub fn run_uci() {
                     idx += 1;
                 }
 
-                println!("bestmove {}", s.search(ms_remaining, ms_inc, debug));
+                if move_time == 0 {
+                    move_time = ms_remaining / 60 + ms_inc;
+                }
+                println!("bestmove {}", s.search(move_time, strict_timing, debug));
             },
             "benchmark" => {
                 match tokens[1] {
@@ -109,7 +119,7 @@ pub fn run_uci() {
                         let mut nps_sum: f64 = 0.;
                         for i in 0..trials {
                             let time: Instant = Instant::now();
-                            let m = s.search(60000, 0, debug);
+                            let m = s.search(500, true, false);
                             let end = time.elapsed().as_millis();
                             s.board.make_move(m);
                             let nps = s.debug.nodes as f64/(end as f64/1000.);

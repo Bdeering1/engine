@@ -4,6 +4,7 @@ use crate::board::{Board, Move};
 use std::time::Instant;
 
 const CHECKMATE_VALUE: i32 = 50000;
+const OUT_OF_TIME_VALUE: i32 = 77777;
 
 pub struct DebugInfo {
     pub nodes: u32,
@@ -13,6 +14,11 @@ pub struct SearchContext {
     pub board: Board,
     best_move: Move,
     search_depth: u32,
+
+    pub strict_timing: bool,
+    move_time: u32,
+    stop_search: bool,
+
     pub debug: DebugInfo,
 }
 
@@ -22,22 +28,30 @@ impl SearchContext {
             board: Board::new(),
             best_move: Move::default(),
             search_depth: 0,
+
+            strict_timing: false,
+            move_time: 0,
+            stop_search: false,
+
             debug: DebugInfo {nodes: 0},
         }
     }
 
-    pub fn search(&mut self, ms_remaining: u32, ms_inc: u32, debug: bool) -> Move {
-        // for tracking how much time has passed in the search [timer.elapsed();]
+    pub fn search(&mut self, move_time: u32, strict_timing: bool, verbose: bool) -> Move {
+        self.strict_timing = strict_timing;
+        self.move_time = move_time;
+        self.stop_search = false;
         self.debug.nodes = 0;
+
         let timer = Instant::now();
 
         self.search_depth = 1;
         loop {
             let score = self.nega_max(&timer, self.search_depth, i32::MIN + 1, i32::MAX);
-            if debug {
+            if verbose && score.abs() != OUT_OF_TIME_VALUE {
                 println!("info depth {} score cp {} pv {}", self.search_depth, score, self.best_move);
             }
-            if timer.elapsed().as_millis() as u32 > ms_remaining / 60 {
+            if timer.elapsed().as_millis() as u32 > move_time {
                 return self.best_move
             }
 
@@ -55,6 +69,11 @@ impl SearchContext {
         }
 
         if depth == 0 { return eval(&self.board); }
+
+        if timer.elapsed().as_millis() as u32 > self.move_time {
+            self.stop_search = true;
+            return OUT_OF_TIME_VALUE;
+        }
 
         let moves = self.board.moves();
         // let mut pv = Move::default();
@@ -75,7 +94,7 @@ impl SearchContext {
             if score > alpha {
                 alpha = score;
                 // pv = cur_move;
-                if is_root { self.best_move = cur_move; }
+                if is_root && !self.stop_search { self.best_move = cur_move; }
             }
             if score >= beta {
                 break;
