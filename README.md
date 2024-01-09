@@ -17,8 +17,7 @@ Rust based chess engine currently under development.
 
  **v0.0.1**
  - piece square tables
- - mobility score
- - delta pruning
+ - transposition tables
 
 ...
 
