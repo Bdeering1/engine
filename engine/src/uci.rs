@@ -1,3 +1,6 @@
+use std::env::current_dir;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 use std::{io::stdin, time::Instant};
 use std::str::FromStr;
 
@@ -115,18 +118,41 @@ pub fn run_uci() {
             "benchmark" => {
                 match tokens[1] {
                     "nps" => { //nodes per second
-                        let trials: u64 = 20;
-                        let mut nps_sum: f64 = 0.;
-                        for i in 0..trials {
-                            let time: Instant = Instant::now();
-                            let m = s.search(500, true, false);
-                            let end = time.elapsed().as_millis();
-                            s.board.make_move(m);
-                            let nps = s.debug.nodes as f64/(end as f64/1000.);
-                            nps_sum += nps;
-                            println!("processed {} nodes in {}ms, ({:.2} nps) [{}/{}]", s.debug.nodes, end, nps, i+1, trials);
+                        if tokens.len() <= 2 {
+                            println!("Expected: benchmark nps <num_test_positions> <moves_per_pos>");
+                            break;
                         }
-                        println!("average nps: {:.2} over {} trials", nps_sum/trials as f64, trials);
+
+                        let startpos_file: File = File::open(current_dir().unwrap().join("tools").join("res").join("openings1.epd")).unwrap();
+                        let mut startpositions = BufReader::new(startpos_file).lines().enumerate();
+                        let num_test_positions: usize = tokens[2].parse::<usize>().unwrap();
+                        let moves_per_pos: usize = tokens[3].parse::<usize>().unwrap();
+                        let mut nps_avg: f64 = 0.;
+                        let mut nps_max: f64 = f64::MIN;
+                        let mut nps_min: f64 = f64::MAX;
+                        let mut trials: f64 = 0.; //could be u64, but saves typecasting
+
+                        println!("started benchmark");
+                        'main_benchmark: while let Some((n, Ok(line))) = startpositions.next() {
+                            s.board = Board::from_fen(&line);
+                            println!("fen # {}: {}", n+1, line);
+                            for i in 0..moves_per_pos {
+                                let time: Instant = Instant::now();
+                                let m = s.search(1000, true, false);
+                                let end = time.elapsed().as_millis();
+                                s.board.make_move(m);
+                                let nps = s.debug.nodes as f64/(end as f64/1000.);
+                                
+                                nps_max = nps_max.max(nps);
+                                nps_min = nps_min.min(nps);
+                                nps_avg = ((nps_avg*trials)+nps)/(trials+1.);
+                                trials += 1.;
+                                println!("processed {} nodes in {}ms, ({:.0} nps) [{}/{}]", s.debug.nodes, end, nps, i+1, moves_per_pos);
+                            }
+                            println!("-----------\nCurrent avg nps: {:.0}nps max: {:.0}nps min: {:.0}nps [{}/{}]\n-----------", nps_avg, nps_max, nps_min, trials, moves_per_pos*num_test_positions);
+                            if n >= num_test_positions-1 {break 'main_benchmark}
+                        }
+                        println!("-----------\nResults [{:.0} trials]\nAvg nps: {:.0}nps\nAvg ms/node {:.3}ms\nMax: {:.0}nps\nMin: {:.0}nps\n-----------", trials, nps_avg, (1./nps_avg)*1000., nps_max, nps_min);
                     },
                     _ => (),
                 }
