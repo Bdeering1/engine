@@ -1,4 +1,5 @@
 use std::{process::Command, env::current_dir};
+use chrono::Local;
 
 use dotenvy_macro::dotenv;
 use num_cpus;
@@ -13,17 +14,17 @@ pub fn run(args: &Vec<String>) {
    println!("running cutechess from {}", cutechess);
 
    let current_dir = current_dir().expect("Failed to get current directory");
-   let project_dir = current_dir.parent().expect("Failed to get project directory").to_path_buf();
 
-   let engine_build_path = project_dir.join("target").join("release").join("engine.exe").to_str().unwrap().to_string();
+   let engine_build_path = current_dir.join("target").join("release").join("engine.exe").to_str().unwrap().to_string();
    let engine_cmd = format!("cmd={}", engine_build_path);
    let opponent_cmd = format!("conf={}", args[0]);
 
    let rounds = format!("{}",args[1]);
 
-   let openings_path = current_dir.join("res").join("openings1.epd").to_str().unwrap().to_string();
+   let openings_path = current_dir.join("tools").join("res").join("openings1.epd").to_str().unwrap().to_string();
    let openings_cmd = format!("file={}", openings_path);
-   //let output_file = format!("{}{}.pgn", somepath, args[2]);
+   let output_path = current_dir.join("tools").join("res").join("testresults").to_str().unwrap().to_string();
+   let output_cmd = format!("{}/{}.pgn", output_path, Local::now().format("%d-%m-%y %H_%M"));
 
    let max_threads = (num_cpus::get() - 2).to_string();
    let run_args = vec!(
@@ -33,7 +34,7 @@ pub fn run(args: &Vec<String>) {
       &opponent_cmd,
       "-each","tc=0/60+0", "proto=uci",
       "-maxmoves","1000",
-      /*"-pgnout", output_file.as_str(),*/
+      "-pgnout", &output_cmd,
       "-games","2",
       "-repeat", "-recover",
       "-resultformat", "wide2",
@@ -48,5 +49,4 @@ pub fn run(args: &Vec<String>) {
    
    //this makes sure that the child process actually exits when the rest of the program exits
    cutechess_program.wait().expect("Cutechess failed to execute");
-
 }
