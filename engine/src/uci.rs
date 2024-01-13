@@ -1,6 +1,8 @@
 use std::env::current_dir;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
+use std::sync::atomic::Ordering;
+use std::thread;
 use std::{io::stdin, time::Instant};
 use std::str::FromStr;
 
@@ -9,10 +11,11 @@ use chess::Color;
 use crate::{board::{Board, Move}, search::SearchContext};
 
 pub fn run_uci() {
-    let mut s = SearchContext::new();
+    let mut sc = SearchContext::new();
     let mut debug = false;
     let mut current_pos = "startpos".to_string();
     let mut move_count = 0;
+    let mut searching = false;
 
     loop {
         let mut buf = String::new();
@@ -35,11 +38,13 @@ pub fn run_uci() {
                 println!("readyok");
             },
             "setoption" => (),
-            "ucinewgame" => (),
+            "ucinewsearch" => (),
             "position" => {
+                searching = false;
+
                 let mut moves_start = 3;
                 if tokens[1] != current_pos {
-                    s.board = match tokens[1] {
+                    sc.board = match tokens[1] {
                         "startpos" => {
                             Board::new()
                         },
@@ -57,15 +62,17 @@ pub fn run_uci() {
                 moves_start += move_count;
                 for idx in moves_start..tokens.len() {
                     let m = Move::from_str(tokens[idx]).unwrap();
-                    s.board.make_move(m);
+                    sc.board.make_move(m);
                     move_count += 1;
                 }
                 if debug {
-                    println!("info string {}", s.board);
+                    println!("info string {}", sc.board);
                     println!("info string move_count = {}", move_count);
                 }
             },
             "go" => {
+                if searching { continue }
+
                 let mut ms_remaining: u32 = 0;
                 let mut ms_inc: u32 = 0;
                 let mut move_time: u32 = 0;
@@ -82,25 +89,25 @@ pub fn run_uci() {
                             strict_timing = true;
                         },
                         "wtime" => {
-                            if s.board.position.side_to_move() == Color::White {
+                            if sc.board.side_to_move() == Color::White {
                                 idx += 1;
                                 ms_remaining = tokens[idx].parse().unwrap();
                             }
                         },
                         "btime" => {
-                            if s.board.position.side_to_move() == Color::Black {
+                            if sc.board.side_to_move() == Color::Black {
                                 idx += 1;
                                 ms_remaining = tokens[idx].parse().unwrap();
                             }
                         },
                         "winc" => {
-                            if s.board.position.side_to_move() == Color::White {
+                            if sc.board.side_to_move() == Color::White {
                                 idx += 1;
                                 ms_inc = tokens[idx].parse().unwrap();
                             }
                         },
                         "binc" => {
-                            if s.board.position.side_to_move() == Color::Black {
+                            if sc.board.side_to_move() == Color::Black {
                                 idx += 1;
                                 ms_inc = tokens[idx].parse().unwrap();
                             }
@@ -113,7 +120,12 @@ pub fn run_uci() {
                 if move_time == 0 {
                     move_time = ms_remaining / 60 + ms_inc;
                 }
-                println!("bestmove {}", s.search(move_time, strict_timing, debug));
+
+                let mut sc = sc.clone();
+                thread::spawn(move || {
+                    println!("bestmove {}", sc.search(move_time, strict_timing, debug));
+                });
+                searching = true;
             },
             "benchmark" => {
                 match tokens[1] {
@@ -134,20 +146,20 @@ pub fn run_uci() {
 
                         println!("started benchmark");
                         'main_benchmark: while let Some((n, Ok(line))) = startpositions.next() {
-                            s.board = Board::from_fen(&line);
+                            sc.board = Board::from_fen(&line);
                             println!("fen # {}: {}", n+1, line);
                             for i in 0..moves_per_pos {
                                 let time: Instant = Instant::now();
-                                let m = s.search(1000, true, false);
+                                let m = sc.search(1000, true, false);
                                 let end = time.elapsed().as_millis();
-                                s.board.make_move(m);
-                                let nps = s.debug.nodes as f64/(end as f64/1000.);
+                                sc.board.make_move(m);
+                                let nps = sc.debug.nodes as f64/(end as f64/1000.);
                                 
                                 nps_max = nps_max.max(nps);
                                 nps_min = nps_min.min(nps);
                                 nps_avg = ((nps_avg*trials)+nps)/(trials+1.);
                                 trials += 1.;
-                                println!("processed {} nodes in {}ms, ({:.0} nps) [{}/{}]", s.debug.nodes, end, nps, i+1, moves_per_pos);
+                                println!("processed {} nodes in {}ms, ({:.0} nps) [{}/{}]", sc.debug.nodes, end, nps, i+1, moves_per_pos);
                             }
                             println!("-----------\nCurrent avg nps: {:.0}nps max: {:.0}nps min: {:.0}nps [{}/{}]\n-----------", nps_avg, nps_max, nps_min, trials, moves_per_pos*num_test_positions);
                             if n >= num_test_positions-1 {break 'main_benchmark}
@@ -158,7 +170,10 @@ pub fn run_uci() {
                 }
             }
             "ponderhit" => (),
-            "stop" => (),
+            "stop" => {
+                sc.stop_search.store(true, Ordering::Relaxed);
+                searching = false;
+            },
             "quit" => break,
             _ => ()
         }

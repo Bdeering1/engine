@@ -1,23 +1,25 @@
 use chess::Piece;
 
 use crate::board::{Board, Move};
-use std::time::Instant;
+use std::{time::Instant, sync::{atomic::{AtomicBool, Ordering}, Arc}};
 
 const CHECKMATE_VALUE: i32 = 50000;
 const OUT_OF_TIME_VALUE: i32 = 77777;
 
+#[derive(Clone, Debug)]
 pub struct DebugInfo {
     pub nodes: u32,
 }
 
+#[derive(Clone)]
 pub struct SearchContext {
     pub board: Board,
     best_move: Move,
     search_depth: u32,
 
-    pub strict_timing: bool,
+    pub stop_search: Arc<AtomicBool>,
+    strict_timing: bool,
     move_time: u32,
-    stop_search: bool,
 
     pub debug: DebugInfo,
 }
@@ -31,16 +33,16 @@ impl SearchContext {
 
             strict_timing: false,
             move_time: 0,
-            stop_search: false,
+            stop_search: Arc::new(AtomicBool::new(false)),
 
-            debug: DebugInfo {nodes: 0},
+            debug: DebugInfo { nodes: 0 },
         }
     }
 
     pub fn search(&mut self, move_time: u32, strict_timing: bool, verbose: bool) -> Move {
         self.strict_timing = strict_timing;
         self.move_time = move_time;
-        self.stop_search = false;
+        self.stop_search.store(false, Ordering::Relaxed);
         self.debug.nodes = 0;
 
         let timer = Instant::now();
@@ -48,10 +50,11 @@ impl SearchContext {
         self.search_depth = 1;
         loop {
             let score = self.nega_max(&timer, self.search_depth, i32::MIN + 1, i32::MAX);
-            if verbose && !self.stop_search {
+            let stop = self.stop_search.load(Ordering::Relaxed);
+            if verbose && !stop {
                 println!("info depth {} score cp {} pv {}", self.search_depth, score, self.best_move);
             }
-            if timer.elapsed().as_millis() as u32 > move_time {
+            if stop || timer.elapsed().as_millis() as u32 > move_time {
                 return self.best_move
             }
 
@@ -61,7 +64,7 @@ impl SearchContext {
 
     fn nega_max(&mut self, timer: &Instant, depth: u32, mut alpha: i32, beta: i32) -> i32 {
         if self.strict_timing && timer.elapsed().as_millis() as u32 > self.move_time {
-            self.stop_search = true;
+            self.stop_search.store(true, Ordering::Relaxed);
             return OUT_OF_TIME_VALUE;
         }
 
@@ -91,7 +94,7 @@ impl SearchContext {
             let score = -self.nega_max(timer, depth - 1, -beta, -alpha);
             self.board.undo_move();
 
-            if self.stop_search { return OUT_OF_TIME_VALUE; }
+            if self.stop_search.load(Ordering::Relaxed) { return OUT_OF_TIME_VALUE; }
 
             if score > alpha {
                 alpha = score;
@@ -108,7 +111,7 @@ impl SearchContext {
 
     fn q_search(&mut self, timer: &Instant, mut alpha: i32, beta: i32) -> i32 {
         if self.strict_timing && timer.elapsed().as_millis() as u32 > self.move_time {
-            self.stop_search = true;
+            self.stop_search.store(true, Ordering::Relaxed);
             return OUT_OF_TIME_VALUE;
         }
 
@@ -135,7 +138,7 @@ impl SearchContext {
             let score = -self.q_search(timer, -beta, -alpha);
             self.board.undo_move();
 
-            if self.stop_search { return OUT_OF_TIME_VALUE; }
+            if self.stop_search.load(Ordering::Relaxed) { return OUT_OF_TIME_VALUE; }
 
             if score >= beta { return beta; }
             if score > alpha { alpha = score; }

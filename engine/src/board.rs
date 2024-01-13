@@ -6,6 +6,7 @@ use chess::{MoveGen, BitBoard, ChessMove, EMPTY, Piece};
 const LIGHT_SQUARES: BitBoard = BitBoard(0x55AA_55AA_55AA_55AA);
 const DARK_SQUARES: BitBoard = BitBoard(0xAA55_AA55_AA55_AA55);
 
+#[derive(Clone)]
 pub struct Board {
     pub position: chess::Board,
     history: Vec<chess::Board>,
@@ -73,6 +74,11 @@ impl Board {
         } else {
             panic!("Attempted to undo a move that doesn't exist!");
         }
+    }
+
+    /// Returns the current side to move
+    pub fn side_to_move(&self) -> chess::Color {
+        self.position.side_to_move()
     }
 
     /// Returns a bitboard of checkers against the current side to move
