@@ -1,6 +1,4 @@
-use chess::Piece;
-
-use crate::board::{Board, Move};
+use crate::{board::{Board, Move}, eval::evaluate};
 use std::{time::Instant, sync::{atomic::{AtomicBool, Ordering}, Arc}};
 
 const CHECKMATE_VALUE: i32 = 50000;
@@ -121,7 +119,7 @@ impl SearchContext {
             return 0;
         }
 
-        let score = eval(&self.board);
+        let score = evaluate(&self.board);
 
         if score >= beta { return beta; }
         if score > alpha { alpha = score; }
@@ -148,25 +146,3 @@ impl SearchContext {
     }
 }
 
-/// !TODO this is a temporary eval implementation for testing
-fn eval(board: &Board) -> i32 {
-    let mut score = 0;
-
-    let pos = board.position;
-    let our_pieces = pos.color_combined(pos.side_to_move());
-    let their_pieces = pos.color_combined(!pos.side_to_move());
-
-    score += (pos.pieces(Piece::Pawn) & our_pieces).popcnt() as i32 * 100;
-    score += (pos.pieces(Piece::Knight) & our_pieces).popcnt() as i32 * 300;
-    score += (pos.pieces(Piece::Bishop) & our_pieces).popcnt() as i32 * 300;
-    score += (pos.pieces(Piece::Rook) & our_pieces).popcnt() as i32 * 500;
-    score += (pos.pieces(Piece::Queen) & our_pieces).popcnt() as i32 * 900;
-
-    score -= (pos.pieces(Piece::Pawn) & their_pieces).popcnt() as i32 * 100;
-    score -= (pos.pieces(Piece::Knight) & their_pieces).popcnt() as i32 * 300;
-    score -= (pos.pieces(Piece::Bishop) & their_pieces).popcnt() as i32 * 300;
-    score -= (pos.pieces(Piece::Rook) & their_pieces).popcnt() as i32 * 500;
-    score -= (pos.pieces(Piece::Queen) & their_pieces).popcnt() as i32 * 900;
-
-    score
-}
