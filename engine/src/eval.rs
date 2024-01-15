@@ -2,8 +2,10 @@ use chess::Piece;
 
 use crate::board::Board;
 
+pub type Eval = i32;
+
 /// !TODO this is a temporary eval implementation for testing
-pub fn evaluate(board: &Board) -> i32 {
+pub fn evaluate(board: &Board) -> Eval {
     let mut score = 0;
 
     let pos = board.position;
