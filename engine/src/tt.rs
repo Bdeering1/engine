@@ -12,7 +12,7 @@ pub enum Bound {
 }
 
 #[derive(Clone, Copy, Default)] 
-struct Transposition {
+pub struct Transposition {
     pub key: u64,
     pub score: Eval,
     pub depth: u8,
@@ -20,7 +20,7 @@ struct Transposition {
     pub best_move: Move,
 }
 
-struct TranspositionTable {
+pub struct TranspositionTable {
     entries: Vec<Transposition>
 }
 
@@ -63,5 +63,9 @@ impl TranspositionTable {
     pub fn insert(&mut self, entry: Transposition) {
         let index = self.index(entry.key);
         self.entries[index] = entry;
+    }
+
+    pub fn size(&self) -> f32 {
+        ((self.entries.len() * Self::ENTRY_SIZE) as f32 / (1024 * 1024) as f32).round()
     }
 }

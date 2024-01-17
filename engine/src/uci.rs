@@ -1,6 +1,7 @@
 use std::env::current_dir;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
+use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use std::thread;
 use std::{io::stdin, time::Instant};
@@ -24,7 +25,9 @@ pub fn run_uci() {
 
         match tokens[0] {
             "uci" => {
-                println!("name engine v0.0 author Bryn Deering");
+                println!("id name engine v0.0");
+                println!("id author Bryn Deering");
+                println!("option name Hash type spin default 16 min 1 max 1048576"); 
                 println!("uciok");
             }
             "debug" => {
@@ -37,7 +40,16 @@ pub fn run_uci() {
             "isready" => {
                 println!("readyok");
             },
-            "setoption" => (),
+            "setoption" => {
+                match tokens[1] {
+                    "Hash" => {
+                        let hash_size = tokens[2].parse::<usize>().unwrap();
+                        Arc::get_mut(&mut sc.tt).unwrap().resize(hash_size);
+                    },
+                    _ => (),
+                }
+            
+            },
             "ucinewsearch" => (),
             "position" => {
                 searching = false;

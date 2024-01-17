@@ -1,4 +1,4 @@
-use crate::{board::{Board, Move}, eval::evaluate};
+use crate::{board::{Board, Move}, eval::evaluate, tt::TranspositionTable};
 use std::{time::Instant, sync::{atomic::{AtomicBool, Ordering}, Arc}};
 
 const CHECKMATE_VALUE: i32 = 50000;
@@ -11,29 +11,31 @@ pub struct DebugInfo {
 
 #[derive(Clone)]
 pub struct SearchContext {
+    pub tt: Arc<TranspositionTable>,
+    pub stop_search: Arc<AtomicBool>,
+
     pub board: Board,
+    pub debug: DebugInfo,
+
     best_move: Move,
     search_depth: u32,
-
-    pub stop_search: Arc<AtomicBool>,
     strict_timing: bool,
     move_time: u32,
-
-    pub debug: DebugInfo,
 }
 
 impl SearchContext {
     pub fn new() -> Self {
         Self {
-            board: Board::new(),
-            best_move: Move::default(),
-            search_depth: 0,
-
-            strict_timing: false,
-            move_time: 0,
+            tt: Arc::new(TranspositionTable::default()),
             stop_search: Arc::new(AtomicBool::new(false)),
 
+            board: Board::new(),
             debug: DebugInfo { nodes: 0 },
+
+            best_move: Move::default(),
+            search_depth: 0,
+            strict_timing: false,
+            move_time: 0,
         }
     }
 
