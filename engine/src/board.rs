@@ -33,6 +33,10 @@ impl Board {
         }
     }
 
+    pub fn hash(&self) -> u64 {
+        self.position.get_hash()
+    }
+
     /// Returns all legal moves in the current position as an iterator
     pub fn moves(&self) -> MoveIterator {
         MoveIterator::new_legal(&self.position)

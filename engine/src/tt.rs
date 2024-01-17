@@ -1,4 +1,4 @@
-use std::mem::size_of;
+use std::{mem::size_of, cell::RefCell};
 
 use crate::{board::Move, eval::Eval};
 
@@ -20,8 +20,36 @@ pub struct Transposition {
     pub best_move: Move,
 }
 
+impl Transposition {
+    pub fn update(&mut self, key: u64, score: Eval, depth: u8, bound: Bound, best_move: Move) {
+        self.key = key;
+        self.score = score;
+        self.depth = depth;
+        self.bound = bound;
+        self.best_move = best_move;
+
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct TCell {
+    inner: RefCell<Transposition>
+}
+
+unsafe impl Sync for TCell { }
+
+impl TCell {
+    pub fn borrow(&self) -> std::cell::Ref<Transposition> {
+        self.inner.borrow()
+    }
+
+    pub fn borrow_mut(&self) -> std::cell::RefMut<Transposition> {
+        self.inner.borrow_mut()
+    }
+}
+
 pub struct TranspositionTable {
-    entries: Vec<Transposition>
+    entries: Vec<TCell>
 }
 
 impl Default for TranspositionTable {
@@ -32,7 +60,7 @@ impl Default for TranspositionTable {
 
 impl TranspositionTable {
     pub const DEFAULT_SIZE: usize = 16;
-    pub const ENTRY_SIZE: usize = size_of::<Transposition>();
+    pub const ENTRY_SIZE: usize = size_of::<TCell>();
 
     fn index(&self, hash: u64) -> usize {
         (hash as usize) % self.entries.len()
@@ -49,20 +77,20 @@ impl TranspositionTable {
 
     pub fn resize(&mut self, size_mib: usize) {
         let entry_count = (size_mib << 20) / Self::ENTRY_SIZE;
-        self.entries.resize(entry_count, Transposition::default());
+        self.entries.resize(entry_count, TCell::default());
     }
 
     pub fn clear(&mut self) {
-        self.entries.iter_mut().for_each(|e| *e = Transposition::default());
+        self.entries.iter_mut().for_each(|e| *e = TCell::default());
     }
 
-    pub fn get(&self, key: u64) -> Transposition {
-        self.entries[self.index(key)]
+    pub fn get(&self, key: u64) -> &TCell {
+        &self.entries[self.index(key)]
     }
 
-    pub fn insert(&mut self, entry: Transposition) {
-        let index = self.index(entry.key);
-        self.entries[index] = entry;
+    pub fn insert(&self, key: u64, score: Eval, depth: u8, bound: Bound, best_move: Move) {
+        let index = self.index(key);
+        self.entries[index].borrow_mut().update(key, score, depth, bound, best_move);
     }
 
     pub fn size(&self) -> f32 {
