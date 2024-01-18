@@ -55,7 +55,13 @@ impl SearchContext {
             if stop || timer.elapsed().as_millis() as u32 > move_time {
                 return self.root_best_move;
             } else {
-                println!("info depth {} score cp {} pv {}", self.search_depth, score, self.root_best_move);
+                println!("info depth {} score cp {} hashfull {} time {} pv {}",
+                    self.search_depth,
+                    score,
+                    self.tt.hashfull(),
+                    timer.elapsed().as_millis(),
+                    self.root_best_move
+                );
             }
 
             self.search_depth += 1;
@@ -93,9 +99,8 @@ impl SearchContext {
         /* Quiescence Search */
         if depth == 0 { return self.q_search(timer, alpha, beta); }
 
-        let moves = self.board.moves();
-
         /* Checkmate or Stalemate */
+        let moves = self.board.moves();
         if moves.len() == 0 {
             return if self.board.checkers().popcnt() > 0 { CHECKMATE_VALUE } else { 0 }
         }

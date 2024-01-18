@@ -96,4 +96,8 @@ impl TranspositionTable {
     pub fn size(&self) -> f32 {
         ((self.entries.len() * Self::ENTRY_SIZE) as f32 / (1024 * 1024) as f32).round()
     }
+
+    pub fn hashfull(&self) -> usize {
+        self.entries.iter().take(1000).filter(|e| e.borrow().key != 0).count()
+    }
 }

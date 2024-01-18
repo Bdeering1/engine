@@ -10,7 +10,7 @@ const DARK_SQUARES: BitBoard = BitBoard(0xAA55_AA55_AA55_AA55);
 pub struct Board {
     pub position: chess::Board,
     history: Vec<chess::Board>,
-    reversible_counts: Vec<usize>,
+    reversible_counts: Vec<u8>,
 }
 
 impl Board {
