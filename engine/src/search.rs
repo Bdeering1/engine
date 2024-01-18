@@ -39,7 +39,7 @@ impl SearchContext {
         }
     }
 
-    pub fn search(&mut self, move_time: u32, strict_timing: bool, verbose: bool) -> Move {
+    pub fn search(&mut self, move_time: u32, strict_timing: bool, _verbose: bool) -> Move {
         self.strict_timing = strict_timing;
         self.move_time = move_time;
         self.stop_search.store(false, Ordering::Relaxed);
@@ -51,11 +51,11 @@ impl SearchContext {
         loop {
             let score = self.nega_max(&timer, self.search_depth, i32::MIN + 1, i32::MAX);
             let stop = self.stop_search.load(Ordering::Relaxed);
-            if verbose && !stop {
-                println!("info depth {} score cp {} pv {}", self.search_depth, score, self.root_best_move);
-            }
+
             if stop || timer.elapsed().as_millis() as u32 > move_time {
-                return self.tt.get(self.board.hash()).borrow().best_move;
+                return self.root_best_move;
+            } else {
+                println!("info depth {} score cp {} pv {}", self.search_depth, score, self.root_best_move);
             }
 
             self.search_depth += 1;
@@ -176,13 +176,12 @@ impl SearchContext {
         let alpha_orig = alpha;
         if score > alpha { alpha = score; }
 
-        let mut moves = self.board.moves();
-        self.board.filter_captures(&mut moves);
-
         /* Checkmate or Stalemate */
+        let mut moves = self.board.moves();
         if moves.len() == 0 {
             return if self.board.checkers().popcnt() > 0 { CHECKMATE_VALUE } else { 0 }
         }
+        self.board.filter_captures(&mut moves);
 
         /* Core Negamax Search */
         let mut best_move = Move::default();
