@@ -3,6 +3,8 @@ use std::str::FromStr;
 
 use chess::{MoveGen, BitBoard, ChessMove, EMPTY, Piece};
 
+const MAX_PLY: usize = 128;
+
 const LIGHT_SQUARES: BitBoard = BitBoard(0x55AA_55AA_55AA_55AA);
 const DARK_SQUARES: BitBoard = BitBoard(0xAA55_AA55_AA55_AA55);
 
@@ -16,20 +18,24 @@ pub struct Board {
 impl Board {
     /// Returns a new instance of `Board` with the default position
     pub fn new() -> Self {
+        let mut reversible_counts = Vec::with_capacity(MAX_PLY);
+        reversible_counts.push(0);
         Self {
             position: chess::Board::default(),
-            history: vec![],
-            reversible_counts: vec![ 0 ],
+            history: Vec::with_capacity(MAX_PLY),
+            reversible_counts
         }
     }
 
     /// Returns a new instance of `Board` with the given fen position
     pub fn from_fen(fen: &str) -> Self {
         let tokens = fen.split(" ").collect::<Vec<&str>>();
+        let mut reversible_counts = Vec::with_capacity(MAX_PLY);
+        reversible_counts.push(tokens[4].parse().unwrap());
         Self {
             position: chess::Board::from_str(fen).unwrap(),
-            history: vec![],
-            reversible_counts: vec![ tokens[4].parse().unwrap() ],
+            history: Vec::with_capacity(MAX_PLY),
+            reversible_counts,
         }
     }
 

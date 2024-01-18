@@ -93,11 +93,47 @@ impl TranspositionTable {
         self.entries[index].borrow_mut().update(key, score, depth, bound, best_move);
     }
 
-    pub fn size(&self) -> f32 {
-        ((self.entries.len() * Self::ENTRY_SIZE) as f32 / (1024 * 1024) as f32).round()
-    }
-
     pub fn hashfull(&self) -> usize {
         self.entries.iter().take(1000).filter(|e| e.borrow().key != 0).count()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tt_new() {
+        let tt = TranspositionTable::new(1);
+        assert_eq!(tt_size(&tt), 1.0);
+    }
+
+    #[test]
+    fn test_tt_resize() {
+        let mut tt = TranspositionTable::new(1);
+        tt.resize(2);
+        assert_eq!(tt_size(&tt), 2.0);
+        assert_eq!(tt.entries.capacity(), (2 << 20) / TranspositionTable::ENTRY_SIZE);
+    }
+
+    #[test]
+    fn test_tt_clear() {
+        let mut tt = TranspositionTable::new(1);
+        tt.insert(1, 1, 1, Bound::Exact, Move::default());
+        tt.insert(1, 1, 1, Bound::Exact, Move::default());
+        tt.clear();
+        assert_eq!(tt.hashfull(), 0);
+    }
+
+    #[test]
+    fn test_tt_insert() {
+        let tt = TranspositionTable::new(1);
+        tt.insert(1, 1, 1, Bound::Exact, Move::default());
+        assert_eq!(tt.get(1).borrow().key, 1);
+        assert_eq!(tt.hashfull(), 1);
+    }
+
+    fn tt_size(tt: &TranspositionTable) -> f32 {
+        ((tt.entries.len() * TranspositionTable::ENTRY_SIZE) as f32 / (1024 * 1024) as f32).round()
     }
 }

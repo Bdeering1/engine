@@ -50,7 +50,9 @@ pub fn run_uci() {
                 }
             
             },
-            "ucinewsearch" => (),
+            "ucinewgame" => {
+                Arc::get_mut(&mut sc.tt).unwrap().clear();
+            },
             "position" => {
                 searching = false;
 

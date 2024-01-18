@@ -191,12 +191,6 @@ struct PhasedEval {
     eg: Eval,
 }
 
-impl fmt::Debug for PhasedEval {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "({}, {})", self.mg, self.eg)
-    }
-}
-
 impl fmt::Display for PhasedEval {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "({}, {})", self.mg, self.eg)
