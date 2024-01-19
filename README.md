@@ -15,9 +15,13 @@ Rust based chess engine currently under development.
   - nodes/s
   - perft
 
- **v0.0.1**
+ **v0.1.0**
  - piece square tables
  - transposition tables
+
+**v0.1.1**
+ - move ordering
+ - delta pruning
 
 ...
 
