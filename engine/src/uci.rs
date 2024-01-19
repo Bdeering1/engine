@@ -143,7 +143,7 @@ pub fn run_uci() {
             },
             "benchmark" => {
                 match tokens[1] {
-                    "nps" => { //nodes per second
+                    "nps" => { // nodes per second
                         if tokens.len() <= 2 {
                             println!("Expected: benchmark nps <num_trials> <ms/move>");
                             break;
@@ -156,29 +156,52 @@ pub fn run_uci() {
                         let mut nps_avg: f64 = 0.;
                         let mut nps_max: f64 = f64::MIN;
                         let mut nps_min: f64 = f64::MAX;
-                        let mut trials: f64 = 0.; //could be u64, but saves typecasting
+                        let mut trials: f64 = 0.0;
 
                         println!("started benchmark");
-                        'main_benchmark: while let Some((n, Ok(line))) = startpositions.next() {
+                        while let Some((n, Ok(line))) = startpositions.next() {
                             sc.board = Board::from_fen(&line);
-                            //println!("fen # {}: {}", n+1, line);
                             let time: Instant = Instant::now();
+
                             sc.search(move_time, true, false);
+
                             let end = time.elapsed().as_millis();
-                            let nps = sc.debug.nodes as f64/(end as f64/1000.);
+                            let nps = sc.debug.nodes as f64 / (end as f64 / 1000.0);
                             
                             nps_max = nps_max.max(nps);
                             nps_min = nps_min.min(nps);
-                            nps_avg = ((nps_avg*trials)+nps)/(trials+1.);
-                            trials += 1.;
-                            println!("processed {} nodes in {}ms, ({:.0} nps) [{}/{}]", sc.debug.nodes, end, nps, n, num_trials);
+                            nps_avg = ((nps_avg * trials) + nps) / (trials + 1.0);
+                            trials += 1.0;
+                            println!("processed {} nodes in {}ms, ({:.0} nps) [{}/{}]",
+                                sc.debug.nodes,
+                                end,
+                                nps,
+                                n,
+                                num_trials
+                            );
                             
                             if n % 20 == 0 {
-                                println!("-----------\nCurrent avg nps: {:.0}nps max: {:.0}nps min: {:.0}nps [{}/{}]\n-----------", nps_avg, nps_max, nps_min, trials, num_trials);
+                                println!("-----------");
+                                println!("Current avg nps: {:.0} nps max: {:.0} nps min: {:.0} nps [{}/{}]",
+                                    nps_avg,
+                                    nps_max,
+                                    nps_min,
+                                    trials,
+                                    num_trials
+                                );
+                                println!("-----------");
                             }
-                            if n >= num_trials-1 {break 'main_benchmark}
+                            if n >= num_trials - 1 { break; }
                         }
-                        println!("-----------\nResults [{:.0} trials]\nAvg nps: {:.0}nps\nAvg ms/node {:.3}ms\nMax: {:.0}nps\nMin: {:.0}nps\n-----------", trials, nps_avg, (1./nps_avg)*1000., nps_max, nps_min);
+                        println!("-----------");
+                        println!("Results [{:.0} trials]\nAvg nps: {:.0} nps\nAvg ms/node {:.3}ms\nMax: {:.0} nps\nMin: {:.0} nps",
+                            trials,
+                            nps_avg,
+                            (1.0 / nps_avg) * 1000.0,
+                            nps_max,
+                            nps_min
+                        );
+                        println!("-----------");
                     },
                     _ => (),
                 }
