@@ -1,5 +1,7 @@
 use std::{mem::size_of, cell::RefCell};
 
+use chess::{Square, Piece};
+
 use crate::{board::Move, eval::Eval};
 
 #[repr(u8)]
@@ -11,39 +13,84 @@ pub enum Bound {
     Exact,
 }
 
-#[derive(Clone, Copy, Default)] 
-pub struct Transposition {
-    pub key: u64,
-    pub score: Eval,
-    pub depth: u8,
-    pub bound: Bound,
-    pub best_move: Move,
+#[derive(Clone, Copy, Default)]
+pub struct CompactMove {
+    data: u16,
 }
 
-impl Transposition {
-    pub fn update(&mut self, key: u64, score: Eval, depth: u8, bound: Bound, best_move: Move) {
-        self.key = key;
-        self.score = score;
-        self.depth = depth;
-        self.bound = bound;
-        self.best_move = best_move;
+impl From<Move> for CompactMove {
+    fn from(mv: Move) -> Self {
+        let to = mv.get_source().to_int() as u16;
+        let from = mv.get_dest().to_int() as u16;
+        let promotion =
+            match mv.get_promotion() {
+                Some(pc) => pc as u16,
+                None => 0
+            };
+        Self {
+            data: to | (from << 6) | (promotion << 12),
+        }
+    }
+}
 
+impl From<CompactMove> for Move {
+    fn from(mv: CompactMove) -> Self {
+        const TO_MASK: u16 = 0x3F;
+        const FROM_MASK: u16 = 0x3F;
+        const FROM_SHIFT: u16 = 6;
+        const PROMO_MASK: u16 = 0xF;
+        const PROMO_SHIFT: u16 = 12;
+
+        let to_bits = mv.data & TO_MASK;
+        let from_bits = (mv.data >> FROM_SHIFT) & FROM_MASK;
+        let promo_bits = (mv.data >> PROMO_SHIFT) & PROMO_MASK;
+        let promo =
+            match promo_bits {
+                1 => Some(Piece::Knight),
+                2 => Some(Piece::Bishop),
+                3 => Some(Piece::Rook),
+                4 => Some(Piece::Queen),
+                _ => None
+            };
+        unsafe { Move::new(Square::new(to_bits as u8), Square::new(from_bits as u8), promo) }
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct Entry {
+    pub key: u64,               // 8 bytes
+    pub score: Eval,            // 4 bytes
+    pub depth: u8,              // 1 byte
+    pub bound: Bound,           // 1 byte
+    pub best_move: CompactMove, // 2 bytes
+}
+
+impl Entry {
+    pub fn new(key: u64, score: Eval, depth: u8, bound: Bound, best_move: Move) -> Self {
+        Self {
+            key,
+            score,
+            depth,
+            bound,
+            best_move: best_move.into(),
+        }
     }
 }
 
 #[derive(Default, Clone)]
 pub struct TCell {
-    inner: RefCell<Transposition>
+    inner: RefCell<Entry>
 }
 
 unsafe impl Sync for TCell { }
 
 impl TCell {
-    pub fn borrow(&self) -> std::cell::Ref<Transposition> {
+    pub fn borrow(&self) -> std::cell::Ref<Entry> {
         self.inner.borrow()
     }
 
-    pub fn borrow_mut(&self) -> std::cell::RefMut<Transposition> {
+    pub fn borrow_mut(&self) -> std::cell::RefMut<Entry> {
         self.inner.borrow_mut()
     }
 }
@@ -90,7 +137,7 @@ impl TranspositionTable {
 
     pub fn insert(&self, key: u64, score: Eval, depth: u8, bound: Bound, best_move: Move) {
         let index = self.index(key);
-        self.entries[index].borrow_mut().update(key, score, depth, bound, best_move);
+        *self.entries[index].borrow_mut() = Entry::new(key, score, depth, bound, best_move);
     }
 
     pub fn hashfull(&self) -> usize {
@@ -131,6 +178,18 @@ mod tests {
         tt.insert(1, 1, 1, Bound::Exact, Move::default());
         assert_eq!(tt.get(1).borrow().key, 1);
         assert_eq!(tt.hashfull(), 1);
+    }
+
+    #[test]
+    fn test_compact_move() {
+        let mv = Move::new(Square::E2, Square::E4, None);
+        let c_mv = CompactMove::from(mv);
+        let mv_res = Move::from(c_mv);
+        assert_eq!(mv, mv_res);
+        let mv = Move::new(Square::H7, Square::H8, Some(Piece::Queen));
+        let c_mv = CompactMove::from(mv);
+        let mv_res = Move::from(c_mv);
+        assert_eq!(mv, mv_res);
     }
 
     fn tt_size(tt: &TranspositionTable) -> f32 {
