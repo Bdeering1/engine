@@ -69,6 +69,8 @@ impl SearchContext {
     }
 
     fn nega_max(&mut self, timer: &Instant, depth: u8, mut alpha: i32, beta: i32) -> i32 {
+        self.debug.nodes += 1;
+
         if self.strict_timing && timer.elapsed().as_millis() as u32 > self.move_time {
             self.stop_search.store(true, Ordering::Relaxed);
             return OUT_OF_TIME_VALUE;
@@ -109,8 +111,6 @@ impl SearchContext {
         let alpha_orig = alpha;
         let mut best_move = Move::default();
         for mv in moves {
-            self.debug.nodes += 1;
-
             self.board.make_move(mv);
             let score = -self.nega_max(timer, depth - 1, -beta, -alpha);
             self.board.undo_move();

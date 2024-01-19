@@ -145,14 +145,14 @@ pub fn run_uci() {
                 match tokens[1] {
                     "nps" => { //nodes per second
                         if tokens.len() <= 2 {
-                            println!("Expected: benchmark nps <num_test_positions> <moves_per_pos>");
+                            println!("Expected: benchmark nps <num_trials> <ms/move>");
                             break;
                         }
 
-                        let startpos_file: File = File::open(current_dir().unwrap().join("tools").join("res").join("openings1.epd")).unwrap();
+                        let startpos_file: File = File::open(current_dir().unwrap().join("tools").join("res").join("lichess_elite_smaller.epd")).unwrap();
                         let mut startpositions = BufReader::new(startpos_file).lines().enumerate();
-                        let num_test_positions: usize = tokens[2].parse::<usize>().unwrap();
-                        let moves_per_pos: usize = tokens[3].parse::<usize>().unwrap();
+                        let num_trials: usize = tokens[2].parse::<usize>().expect("Expected: benchmark nps <num_trials> <ms/move>");
+                        let move_time: u32 = tokens[3].parse::<u32>().expect("Expected: benchmark nps <num_trials> <ms/move>");
                         let mut nps_avg: f64 = 0.;
                         let mut nps_max: f64 = f64::MIN;
                         let mut nps_min: f64 = f64::MAX;
@@ -161,28 +161,28 @@ pub fn run_uci() {
                         println!("started benchmark");
                         'main_benchmark: while let Some((n, Ok(line))) = startpositions.next() {
                             sc.board = Board::from_fen(&line);
-                            println!("fen # {}: {}", n+1, line);
-                            for i in 0..moves_per_pos {
-                                let time: Instant = Instant::now();
-                                let m = sc.search(1000, true, false);
-                                let end = time.elapsed().as_millis();
-                                sc.board.make_move(m);
-                                let nps = sc.debug.nodes as f64/(end as f64/1000.);
-                                
-                                nps_max = nps_max.max(nps);
-                                nps_min = nps_min.min(nps);
-                                nps_avg = ((nps_avg*trials)+nps)/(trials+1.);
-                                trials += 1.;
-                                println!("processed {} nodes in {}ms, ({:.0} nps) [{}/{}]", sc.debug.nodes, end, nps, i+1, moves_per_pos);
+                            //println!("fen # {}: {}", n+1, line);
+                            let time: Instant = Instant::now();
+                            sc.search(move_time, true, false);
+                            let end = time.elapsed().as_millis();
+                            let nps = sc.debug.nodes as f64/(end as f64/1000.);
+                            
+                            nps_max = nps_max.max(nps);
+                            nps_min = nps_min.min(nps);
+                            nps_avg = ((nps_avg*trials)+nps)/(trials+1.);
+                            trials += 1.;
+                            println!("processed {} nodes in {}ms, ({:.0} nps) [{}/{}]", sc.debug.nodes, end, nps, n, num_trials);
+                            
+                            if n % 20 == 0 {
+                                println!("-----------\nCurrent avg nps: {:.0}nps max: {:.0}nps min: {:.0}nps [{}/{}]\n-----------", nps_avg, nps_max, nps_min, trials, num_trials);
                             }
-                            println!("-----------\nCurrent avg nps: {:.0}nps max: {:.0}nps min: {:.0}nps [{}/{}]\n-----------", nps_avg, nps_max, nps_min, trials, moves_per_pos*num_test_positions);
-                            if n >= num_test_positions-1 {break 'main_benchmark}
+                            if n >= num_trials-1 {break 'main_benchmark}
                         }
                         println!("-----------\nResults [{:.0} trials]\nAvg nps: {:.0}nps\nAvg ms/node {:.3}ms\nMax: {:.0}nps\nMin: {:.0}nps\n-----------", trials, nps_avg, (1./nps_avg)*1000., nps_max, nps_min);
                     },
                     _ => (),
                 }
-            }
+            },
             "ponderhit" => (),
             "stop" => {
                 sc.stop_search.store(true, Ordering::Relaxed);
