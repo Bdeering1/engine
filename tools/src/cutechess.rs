@@ -17,7 +17,7 @@ pub fn run(args: &Vec<String>) {
 
    let engine_build_path = current_dir.join("target").join("release").join("engine.exe").to_str().unwrap().to_string();
    let engine_cmd = format!("cmd={}", engine_build_path);
-   let opponent_cmd = format!("conf={}", args[0]);
+   let opponent_cmd = format!("cmd={}", args[0]);
 
    let rounds = format!("{}",args[1]);
 
@@ -32,7 +32,7 @@ pub fn run(args: &Vec<String>) {
       &engine_cmd, "name=current-iter",
       "-engine",
       &opponent_cmd,
-      "-each","tc=0/60+0", "proto=uci",
+      "-each","tc=0/60+0.1", "proto=uci",
       "-maxmoves","1000",
       "-pgnout", &output_cmd,
       "-games","2",

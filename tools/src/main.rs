@@ -12,7 +12,7 @@ fn main() {
 
    let cmd = args[1].as_str();
    match cmd {
-    "cutechess" => cutechess::run(&args[2..].to_vec()),
-     _ => println!("Unknown command: {}", cmd),
+      "cutechess" => cutechess::run(&args[2..].to_vec()),
+      _ => println!("Unknown command: {}", cmd),
    }
 }
