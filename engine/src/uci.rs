@@ -25,7 +25,7 @@ pub fn run_uci() {
 
         match tokens[0] {
             "uci" => {
-                println!("id name engine v0.0");
+                println!("id name engine v0.1.1");
                 println!("id author Bryn Deering");
                 println!("option name Hash type spin default 16 min 1 max 1048576"); 
                 println!("uciok");
