@@ -1,3 +1,29 @@
+## v0.1.1
+- checkmate detection fix
+- fifty move rule detection fix
+- optimized compilation for runtime performance
+
+Score of v0.1.1 vs v0.1.0: 553 - 436 - 11  [0.558] 1000 \
+&nbsp; v0.1.1 playing White: 278 - 215 - 7  [0.563] 500 \
+&nbsp; v0.1.1 playing Black: 275 - 221 - 4  [0.554] 500 \
+&nbsp; White vs Black: 499 - 490 - 11  [0.504] 1000
+
+Elo difference: 40.8 +/- 21.6, LOS: 100.0 %, DrawRatio: 1.1 % \
+SPRT: llr 0 (0.0%), lbound -inf, ubound inf
+
+Player: v0.1.1 \
+&nbsp; "Draw by 3-fold repetition": 7 \
+&nbsp; "Draw by timeout": 4 \
+&nbsp; "Loss: Black loses on time": 221 \
+&nbsp; "Loss: White loses on time": 215 \
+&nbsp; "Win: Black loses on time": 135 \
+&nbsp; "Win: Black mates": 112 \
+&nbsp; "Win: White loses on time": 163 \
+&nbsp; "Win: White mates": 143
+
+STS rating: 1208 \
+Hash: 128, Threads: 1, MoveTime: 1.0s
+
 ## v0.1.0
 - transposition table
 - piece square tables
