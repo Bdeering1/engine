@@ -11,15 +11,12 @@ Rust based chess engine currently under development.
 - strength testing
   - cutechess tournament script
   - STS based rating
-- benchmarks
-  - nodes/s
-  - perft
 
  **v0.1.0**
  - piece square tables
  - transposition tables
 
-**v0.1.1**
+**v0.2.0**
  - move ordering
  - delta pruning
 
@@ -28,3 +25,6 @@ Rust based chess engine currently under development.
 **v1.0.0**
 - search parameter tuning
 - multi-threaded search
+- benchmarks
+  - nps
+  - perft
