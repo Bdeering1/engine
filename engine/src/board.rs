@@ -65,8 +65,6 @@ impl Board {
     /// Make a move on the board
     pub fn make_move(&mut self, mv: Move) {
         self.history.push(self.position);
-        self.position = self.position.make_move_new(mv);
-
         self.reversible_counts.push(
             if self.is_reversible(mv) {
                 self.reversible_counts[self.reversible_counts.len() - 1] + 1
@@ -74,6 +72,7 @@ impl Board {
                 0
             }
         );
+        self.position = self.position.make_move_new(mv);
     }
     
     /// Undo the most recent move
@@ -147,7 +146,7 @@ impl Board {
         false
     }
 
-    /// Returns true if the position should be considered drawn by insufficient material
+    /// Returns true if the neither side can force a win
     /// 
     /// Included cases:
     ///
@@ -158,7 +157,7 @@ impl Board {
     /// Edge cases:
     /// king + 2 knights vs king
     /// king + knight vs king + knight
-    /// - both return true: neither position is a technically a draw but no forced win is possible
+    /// - both return true: no forced win is possible
     ///
     /// king + bishop vs king + knight
     /// - returns false: no forced win is possible, but ignoring this case speeds up the function
@@ -187,9 +186,11 @@ impl Board {
     }
 
     /// Returns true if the given move is reversible (not a pawn move or capture)
+    ///
+    /// *must* be called before a move is made
     fn is_reversible(&self, mv: Move) -> bool {
-        self.position.piece_on(mv.get_source()) == Some(Piece::Pawn)
-        || self.position.color_on(mv.get_dest()) == Some(!self.position.side_to_move())
+        self.position.piece_on(mv.get_source()) != Some(Piece::Pawn)
+        && self.position.color_on(mv.get_dest()) != Some(!self.position.side_to_move())
     }
 }
 
@@ -231,7 +232,13 @@ mod tests {
 
     #[test]
     fn test_is_fifty_move_draw() {
-        assert!(Board::from_fen("K6k/8/8/8/8/8/8/8 w - - 100 80").is_fifty_move_draw());
+        let mut board = Board::from_fen("R4K1k/8/8/8/8/8/8/8 w - - 99 80");
+        board.make_move(Move::new(Square::F8, Square::F7, None));
+        assert!(board.is_fifty_move_draw());
+
+        let mut board = Board::from_fen("8/1R5p/6k1/8/8/8/1R4K1/8 w - - 99 60");
+        board.make_move(Move::new(Square::B7, Square::H7, None));
+        assert!(!board.is_fifty_move_draw());
     }
 
     #[test]

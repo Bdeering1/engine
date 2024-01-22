@@ -46,6 +46,7 @@ impl SearchContext {
         self.debug.nodes = 0;
 
         let timer = Instant::now();
+        let mut best_move = Move::default();
 
         self.search_depth = 1;
         loop {
@@ -53,17 +54,17 @@ impl SearchContext {
             let stop = self.stop_search.load(Ordering::Relaxed);
 
             if stop || timer.elapsed().as_millis() as u32 > move_time {
-                return self.root_best_move;
-            } else {
-                println!("info depth {} score cp {} hashfull {} time {} pv {}",
-                    self.search_depth,
-                    score,
-                    self.tt.hashfull(),
-                    timer.elapsed().as_millis(),
-                    self.root_best_move
-                );
+                return best_move;
             }
+            println!("info depth {} score cp {} hashfull {} time {} pv {}",
+                self.search_depth,
+                score,
+                self.tt.hashfull(),
+                timer.elapsed().as_millis(),
+                self.root_best_move
+            );
 
+            best_move = self.root_best_move;
             self.search_depth += 1;
         }
     }
@@ -74,6 +75,20 @@ impl SearchContext {
         if self.strict_timing && timer.elapsed().as_millis() as u32 > self.move_time {
             self.stop_search.store(true, Ordering::Relaxed);
             return OUT_OF_TIME_VALUE;
+        }
+
+        /* Non-Stalemate Draw Conditions
+         *
+         * repeated positions and fifty move rule must be checked before checking
+         * transpositions, otherwise they may be ignored
+         * positions with insufficient material are not stored in the table
+        */
+        let is_root = depth == self.search_depth;
+        if !is_root
+            && (self.board.is_repeated()
+            || self.board.is_insufficient_material()
+            || self.board.is_fifty_move_draw()) {
+            return 0;
         }
 
         /* Probe Transposition Table */
@@ -89,22 +104,13 @@ impl SearchContext {
             }
         }
 
-        /* Non-Stalemate Draw Conditions */
-        let is_root = depth == self.search_depth;
-        if !is_root
-            && (self.board.is_repeated()
-            || self.board.is_insufficient_material()
-            || self.board.is_fifty_move_draw()) {
-            return 0;
-        }
-
         /* Quiescence Search */
         if depth == 0 { return self.q_search(timer, alpha, beta); }
 
         /* Checkmate or Stalemate */
         let moves = self.board.moves();
         if moves.len() == 0 {
-            return if self.board.checkers().popcnt() > 0 { CHECKMATE_VALUE } else { 0 }
+            return if self.board.checkers().popcnt() > 0 { -CHECKMATE_VALUE + (self.search_depth - depth) as i32 } else { 0 }
         }
 
         /* Core Negamax Search */
@@ -145,7 +151,7 @@ impl SearchContext {
             tt_bound,
             best_move,
         );
-        
+
         alpha
     }
 
@@ -153,6 +159,13 @@ impl SearchContext {
         if self.strict_timing && timer.elapsed().as_millis() as u32 > self.move_time {
             self.stop_search.store(true, Ordering::Relaxed);
             return OUT_OF_TIME_VALUE;
+        }
+
+        /* Non-Stalemate Draw Conditions */
+        if self.board.is_repeated()
+            || self.board.is_insufficient_material()
+            || self.board.is_fifty_move_draw() {
+            return 0;
         }
 
         /* Probe Transposition Table */
@@ -168,23 +181,16 @@ impl SearchContext {
             }
         }
 
-        /* Non-Stalemate Draw Conditions */
-        if self.board.is_repeated()
-            || self.board.is_insufficient_material()
-            || self.board.is_fifty_move_draw() {
-            return 0;
-        }
-
         /* Standing Pat */
         let score = evaluate(&self.board);
-        if score >= beta { return beta; }
+        if self.board.checkers().popcnt() == 0 && score >= beta { return beta; }
         let alpha_orig = alpha;
         if score > alpha { alpha = score; }
 
         /* Checkmate or Stalemate */
         let mut moves = self.board.moves();
         if moves.len() == 0 {
-            return if self.board.checkers().popcnt() > 0 { CHECKMATE_VALUE } else { 0 }
+            return if self.board.checkers().popcnt() > 0 { -CHECKMATE_VALUE + self.search_depth as i32 } else { 0 }
         }
         self.board.filter_captures(&mut moves);
 
@@ -228,3 +234,50 @@ impl SearchContext {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chess::Square;
+    use crate::board::Board;
+
+    #[test]
+    fn test_checkmate_position() {
+        let mut sc = SearchContext::new();
+        sc.board = Board::from_fen("6k1/8/R5K1/8/8/8/8/8 w - - 0 1");
+        let mv = sc.search(20, true, false);
+        assert_eq!(mv, Move::new(Square::A6, Square::A8, None));
+    }
+
+    #[test]
+    fn test_repeated_draw() {
+        let mut sc = SearchContext::new();
+        sc.board = Board::from_fen("r5k1/5p2/3n1QpK/8/8/8/8/8 w - - 0 1");
+        sc.board.make_move(Move::new(Square::F6, Square::E7, None));
+        sc.board.make_move(Move::new(Square::G8, Square::H8, None));
+        sc.board.make_move(Move::new(Square::E7, Square::F6, None));
+        sc.board.make_move(Move::new(Square::H8, Square::G8, None));
+        sc.board.make_move(Move::new(Square::F6, Square::E7, None));
+        sc.board.make_move(Move::new(Square::G8, Square::H8, None));
+        let mv = sc.search(20, true, false);
+        // white cannot play Qe7 (attempting M2) to avoid a draw
+        assert_ne!(mv, Move::new(Square::F6, Square::E7, None));
+    }
+
+    #[test]
+    fn test_fifty_move_draw() {
+        let mut sc = SearchContext::new();
+        sc.board = Board::from_fen("8/1R5p/6k1/8/8/8/1R4K1/8 w - - 99 60");
+        let mv = sc.search(20, true, false);
+        // white must sacrifice material to avoid a draw
+        assert_eq!(mv, Move::new(Square::B7, Square::H7, None));
+    }
+
+    #[test]
+    fn test_insufficient_material() {
+        let mut sc = SearchContext::new();
+        sc.board = Board::from_fen("5Nbk/4KP2/8/8/8/8/8/8 w - - 0 1");
+        let mv = sc.search(20, true, false);
+        // white must not trade to avoid a draw
+        assert_eq!(mv, Move::new(Square::F8, Square::G6, None));
+    }
+}
