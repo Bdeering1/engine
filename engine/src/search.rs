@@ -46,7 +46,6 @@ impl SearchContext {
         self.debug.nodes = 0;
 
         let timer = Instant::now();
-        let mut best_move = Move::default();
 
         self.search_depth = 1;
         loop {
@@ -54,7 +53,7 @@ impl SearchContext {
             let stop = self.stop_search.load(Ordering::Relaxed);
 
             if stop || timer.elapsed().as_millis() as u32 > move_time {
-                return best_move;
+                return self.root_best_move
             }
             println!("info depth {} score cp {} hashfull {} time {} pv {}",
                 self.search_depth,
@@ -64,7 +63,6 @@ impl SearchContext {
                 self.root_best_move
             );
 
-            best_move = self.root_best_move;
             self.search_depth += 1;
         }
     }
@@ -84,15 +82,14 @@ impl SearchContext {
          * positions with insufficient material are not stored in the table
         */
         let is_root = depth == self.search_depth;
-        if !is_root
-            && (self.board.is_repeated()
+        if !is_root {
+            if self.board.is_repeated()
             || self.board.is_insufficient_material()
-            || self.board.is_fifty_move_draw()) {
-            return 0;
-        }
+            || self.board.is_fifty_move_draw() {
+                return 0;
+            }
 
-        /* Probe Transposition Table */
-        {
+            /* Probe Transposition Table */
             let tt_entry = self.tt.get(self.board.hash()).borrow();
             if tt_entry.key == self.board.hash() && tt_entry.depth >= depth {
                 match tt_entry.bound {
@@ -103,6 +100,7 @@ impl SearchContext {
                 }
             }
         }
+
 
         /* Quiescence Search */
         if depth == 0 { return self.q_search(timer, alpha, beta); }
