@@ -1,12 +1,16 @@
-use crate::{board::{Board, Move}, eval::evaluate, tt::{TranspositionTable, Bound}};
+use chess::Piece;
+
+use crate::{board::{Board, Move}, eval::{evaluate, Eval}, tt::{TranspositionTable, Bound}};
 use std::{time::Instant, sync::{atomic::{AtomicBool, Ordering}, Arc}};
 
-const CHECKMATE_VALUE: i32 = 50000;
-const OUT_OF_TIME_VALUE: i32 = 77777;
+const CHECKMATE_VALUE: Eval = 50000;
+const OUT_OF_TIME_VALUE: Eval = 77777;
+const FUTILITY_MARGIN: Eval = 200;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct DebugInfo {
     pub nodes: u32,
+    pub delta_pruned: u32,
 }
 
 #[derive(Clone)]
@@ -30,7 +34,7 @@ impl SearchContext {
             stop_search: Arc::new(AtomicBool::new(false)),
 
             board: Board::new(),
-            debug: DebugInfo { nodes: 0 },
+            debug: DebugInfo::default(),
 
             root_best_move: Move::default(),
             search_depth: 0,
@@ -52,6 +56,7 @@ impl SearchContext {
             let score = self.nega_max(&timer, self.search_depth, i32::MIN + 1, i32::MAX);
             let stop = self.stop_search.load(Ordering::Relaxed);
 
+            println!("info string nodes {} delta_pruned {}", self.debug.nodes, self.debug.delta_pruned);
             if stop || timer.elapsed().as_millis() as u32 > move_time {
                 return self.root_best_move
             }
@@ -180,10 +185,10 @@ impl SearchContext {
         }
 
         /* Standing Pat */
-        let score = evaluate(&self.board);
-        if self.board.checkers().popcnt() == 0 && score >= beta { return beta; }
+        let static_eval = evaluate(&self.board);
+        if self.board.checkers().popcnt() == 0 && static_eval >= beta { return beta; }
         let alpha_orig = alpha;
-        if score > alpha { alpha = score; }
+        if static_eval > alpha { alpha = static_eval; }
 
         /* Checkmate or Stalemate */
         let mut moves = self.board.moves();
@@ -195,6 +200,20 @@ impl SearchContext {
         /* Core Negamax Search */
         let mut best_move = Move::default();
         for mv in moves {
+            /* Futility (Delta) Pruning */
+            let capture_val = match self.board.piece_on(mv.get_dest()).unwrap() {
+                Piece::Pawn => 100,
+                Piece::Knight => 300,
+                Piece::Bishop => 300,
+                Piece::Rook => 500,
+                Piece::Queen => 900,
+                _ => 0,
+            };
+            if static_eval + capture_val + FUTILITY_MARGIN < alpha {
+                self.debug.delta_pruned += 1;
+                continue;
+            }
+
             self.board.make_move(mv);
             let score = -self.q_search(timer, -beta, -alpha);
             self.board.undo_move();

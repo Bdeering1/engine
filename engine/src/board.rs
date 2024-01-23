@@ -1,7 +1,7 @@
 use std::fmt;
 use std::str::FromStr;
 
-use chess::{MoveGen, BitBoard, ChessMove, EMPTY, Piece};
+use chess::{MoveGen, BitBoard, ChessMove, EMPTY, Piece, Square};
 
 const MAX_PLY: usize = 128;
 
@@ -93,6 +93,10 @@ impl Board {
     /// Returns a bitboard of checkers against the current side to move
     pub fn checkers(&self) -> &BitBoard {
         self.position.checkers()
+    }
+
+    pub fn piece_on(&self, sq: Square) -> Option<Piece> {
+        self.position.piece_on(sq)
     }
 
     /// Returns true if the current position matches a previous one
