@@ -7,5 +7,13 @@ members = [
     "tools",
 ]
 
+[profile.dev.package.chess]
+opt-level = 3
 [profile.release]
 codegen-units = 1
+lto = "fat"
+
+[profile.dev.build-override]
+opt-level = 3
+[profile.release.build-override]
+opt-level = 3
