@@ -8,6 +8,8 @@ const MAX_PLY: usize = 128;
 const LIGHT_SQUARES: BitBoard = BitBoard(0x55AA_55AA_55AA_55AA);
 const DARK_SQUARES: BitBoard = BitBoard(0xAA55_AA55_AA55_AA55);
 
+pub type Move = ChessMove;
+
 #[derive(Clone)]
 pub struct Board {
     pub position: chess::Board,
@@ -42,24 +44,9 @@ impl Board {
     pub fn hash(&self) -> u64 {
         self.position.get_hash()
     }
-
-    /// Returns all legal moves in the current position as an iterator
-    pub fn moves(&self) -> MoveIterator {
-        MoveIterator::new_legal(&self.position)
-    }
-
-    /// Filters a given `MoveIterator` to only include captures
-    pub fn filter_captures(&self, moves: &mut MoveIterator) {
-        let targets = self.position.color_combined(!self.position.side_to_move());
-        moves.set_iterator_mask(*targets);
-    }
-
-    /// Filters a given `MoveIterator` to include all remaining moves
-    ///
-    /// Used in conjunction with `filter_captures`
-    pub fn filter_remaining(&self, moves: &mut MoveIterator) {
-        let targets = self.position.color_combined(!self.position.side_to_move()) ^ !EMPTY;
-        moves.set_iterator_mask(targets);
+    
+    pub fn sorted_moves(&self, pv: Option<Move>, captures_only: bool) -> MoveGen {
+        MoveGen::new_sorted(&self.position, pv, captures_only)
     }
 
     /// Make a move on the board
@@ -203,10 +190,6 @@ impl fmt::Display for Board {
         write!(f, "{}", self.position)
     }
 }
-
-pub type MoveIterator = MoveGen;
-
-pub type Move = ChessMove;
 
 #[cfg(test)]
 mod tests {

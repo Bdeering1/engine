@@ -2,7 +2,7 @@ use crate::board::Board;
 
 pub fn perft(board: &mut Board, depth: u8) -> usize {
     let mut nodes = 0;
-    let moves = board.moves();
+    let moves = board.sorted_moves(None, false);
 
     if depth == 1 {
         return moves.len();

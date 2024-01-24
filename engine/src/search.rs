@@ -50,6 +50,7 @@ impl SearchContext {
         self.debug.nodes = 0;
 
         let timer = Instant::now();
+        let mut best_move = Move::default();
 
         self.search_depth = 1;
         loop {
@@ -58,7 +59,7 @@ impl SearchContext {
 
             println!("info string nodes {} delta_pruned {}", self.debug.nodes, self.debug.delta_pruned);
             if stop || timer.elapsed().as_millis() as u32 > move_time {
-                return self.root_best_move
+                return best_move;
             }
             println!("info depth {} score cp {} hashfull {} time {} pv {}",
                 self.search_depth,
@@ -68,6 +69,7 @@ impl SearchContext {
                 self.root_best_move
             );
 
+            best_move = self.root_best_move;
             self.search_depth += 1;
         }
     }
@@ -80,13 +82,15 @@ impl SearchContext {
             return OUT_OF_TIME_VALUE;
         }
 
+        let mut best_move = None;
+        let is_root = depth == self.search_depth;
+
         /* Non-Stalemate Draw Conditions
          *
          * repeated positions and fifty move rule must be checked before checking
          * transpositions, otherwise they may be ignored
          * positions with insufficient material are not stored in the table
         */
-        let is_root = depth == self.search_depth;
         if !is_root {
             if self.board.is_repeated()
             || self.board.is_insufficient_material()
@@ -103,22 +107,24 @@ impl SearchContext {
                     Bound::Lower if tt_entry.score >= beta => return beta,
                     _ => ()
                 }
+                best_move = Some(tt_entry.best_move.into());
+                if best_move.unwrap() == Move::default() {
+                    best_move = None;
+                }
             }
         }
-
 
         /* Quiescence Search */
         if depth == 0 { return self.q_search(timer, alpha, beta); }
 
         /* Checkmate or Stalemate */
-        let moves = self.board.moves();
+        let moves = self.board.sorted_moves(best_move, false);
         if moves.len() == 0 {
             return if self.board.checkers().popcnt() > 0 { -CHECKMATE_VALUE + (self.search_depth - depth) as i32 } else { 0 }
         }
 
         /* Core Negamax Search */
         let alpha_orig = alpha;
-        let mut best_move = Move::default();
         for mv in moves {
             self.board.make_move(mv);
             let score = -self.nega_max(timer, depth - 1, -beta, -alpha);
@@ -128,7 +134,7 @@ impl SearchContext {
 
             if score > alpha {
                 alpha = score;
-                best_move = mv;
+                best_move = Some(mv);
 
                 if score >= beta {
                     break;
@@ -152,7 +158,7 @@ impl SearchContext {
             alpha,
             depth,
             tt_bound,
-            best_move,
+            best_move.unwrap_or_default(),
         );
 
         alpha
@@ -171,6 +177,8 @@ impl SearchContext {
             return 0;
         }
 
+        let mut best_move = None;
+
         /* Probe Transposition Table */
         {
             let tt_entry = self.tt.get(self.board.hash()).borrow();
@@ -181,6 +189,10 @@ impl SearchContext {
                     Bound::Lower if tt_entry.score >= beta => return beta,
                     _ => ()
                 }
+                best_move = Some(tt_entry.best_move.into());
+                if best_move.unwrap() == Move::default() {
+                    best_move = None;
+                }
             }
         }
 
@@ -190,24 +202,17 @@ impl SearchContext {
         let alpha_orig = alpha;
         if static_eval > alpha { alpha = static_eval; }
 
-        /* Checkmate or Stalemate */
-        let mut moves = self.board.moves();
-        if moves.len() == 0 {
-            return if self.board.checkers().popcnt() > 0 { -CHECKMATE_VALUE + self.search_depth as i32 } else { 0 }
-        }
-        self.board.filter_captures(&mut moves);
-
         /* Core Negamax Search */
-        let mut best_move = Move::default();
+        let moves = self.board.sorted_moves(best_move, true);
         for mv in moves {
             /* Futility (Delta) Pruning */
-            let capture_val = match self.board.piece_on(mv.get_dest()).unwrap() {
-                Piece::Pawn => 100,
-                Piece::Knight => 300,
-                Piece::Bishop => 300,
-                Piece::Rook => 500,
-                Piece::Queen => 900,
-                _ => 0,
+            let capture_val = match self.board.piece_on(mv.get_dest()) {
+                Some(Piece::Pawn) => 100,
+                Some(Piece::Knight) => 300,
+                Some(Piece::Bishop) => 300,
+                Some(Piece::Rook) => 500,
+                Some(Piece::Queen) => 900,
+                _ => 0, // case where non-capture is read from tt move
             };
             if static_eval + capture_val + FUTILITY_MARGIN < alpha {
                 self.debug.delta_pruned += 1;
@@ -222,7 +227,7 @@ impl SearchContext {
 
             if score > alpha {
                 alpha = score;
-                best_move = mv;
+                best_move = Some(mv);
 
                 if score >= beta {
                     return beta;
@@ -244,7 +249,7 @@ impl SearchContext {
             alpha,
             0,
             tt_bound,
-            best_move,
+            best_move.unwrap_or_default(),
         );
         
         alpha
