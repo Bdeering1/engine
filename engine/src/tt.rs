@@ -52,7 +52,7 @@ impl From<CompactMove> for Move {
                 4 => Some(Piece::Queen),
                 _ => None
             };
-        unsafe { Move::new(Square::new(to_bits as u8), Square::new(from_bits as u8), promo) }
+        Move::new(Square::new(to_bits as u8), Square::new(from_bits as u8), promo)
     }
 }
 

@@ -43,7 +43,7 @@ impl SearchContext {
         }
     }
 
-    pub fn search(&mut self, move_time: u32, strict_timing: bool, _verbose: bool) -> Move {
+    pub fn search(&mut self, move_time: u32, strict_timing: bool, verbose: bool) -> Move {
         self.strict_timing = strict_timing;
         self.move_time = move_time;
         self.stop_search.store(false, Ordering::Relaxed);
@@ -57,16 +57,20 @@ impl SearchContext {
             let score = self.nega_max(&timer, self.search_depth, i32::MIN + 1, i32::MAX);
             let stop = self.stop_search.load(Ordering::Relaxed);
 
-            println!("info string nodes {} delta_pruned {}", self.debug.nodes, self.debug.delta_pruned);
+            if verbose {
+                println!("info string nodes {} delta_pruned {}", self.debug.nodes, self.debug.delta_pruned);
+            }
             if stop || timer.elapsed().as_millis() as u32 > move_time {
                 return best_move;
             }
+
+            let pv = self.trace_pv();
             println!("info depth {} score cp {} hashfull {} time {} pv {}",
                 self.search_depth,
                 score,
                 self.tt.hashfull(),
                 timer.elapsed().as_millis(),
-                self.root_best_move
+                pv,
             );
 
             best_move = self.root_best_move;
@@ -254,7 +258,30 @@ impl SearchContext {
         
         alpha
     }
+
+    fn trace_pv(&mut self) -> String {
+        let mut pv_line = String::with_capacity(self.search_depth as usize * 5);
+        let mut move_count = 0;
+        loop {
+            let tt_entry = self.tt.get(self.board.hash()).borrow();
+            let pv_move: Move = tt_entry.best_move.into();
+            if tt_entry.key == self.board.hash() && pv_move != Move::default() {
+                pv_line.push_str(&format!("{} ", pv_move));
+                self.board.make_move(pv_move);
+                move_count += 1;
+            } else {
+                break;
+            }
+        }
+        while move_count > 0 {
+            self.board.undo_move();
+            move_count -= 1;
+        }
+
+        pv_line
+    }
 }
+
 
 #[cfg(test)]
 mod tests {
