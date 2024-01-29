@@ -20,6 +20,16 @@ Rust based chess engine currently under development.
  - move ordering
  - delta pruning
 
+**0.3.0**
+- multi-threading
+- transposition table improvements
+
+**0.4.0**
+- better evaluation
+  - king safety
+  - piece acitivity
+  - pawn structure
+
 ...
 
 **v1.0.0**
