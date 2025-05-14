@@ -1,7 +1,11 @@
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/02acf234-bde7-46e2-8cea-acf9efbc7bad" />
+</p>
+<hr/>
 Rust based chess engine currently under development.
 
 ## Roadmap
-**v0.0.0**
+**v0.0.0** - done
 - board representation
   - legal move generator
   - draw detection
@@ -12,7 +16,7 @@ Rust based chess engine currently under development.
   - cutechess tournament script
   - STS based rating
 
- **v0.1.0**
+ **v0.1.0** - done
  - piece square tables
  - transposition tables
 
